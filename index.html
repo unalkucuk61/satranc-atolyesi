@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamsifleto - Satranç Taş Hareketleri ve Matris Dinamikleri</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151d30;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --board-light: #cbd5e1;
+            --board-dark: #475569;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 25px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--accent);
+            margin: 0 0 8px 0;
+            font-size: 2.2rem;
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 1.05rem;
+        }
+
+        .controls-global {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 20px auto 0 auto;
+            background: var(--card-bg);
+            padding: 12px 24px;
+            border-radius: 10px;
+            width: fit-content;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border: 1px solid #1e293b;
+        }
+
+        .btn {
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid #334155;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 25px;
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #1e293b;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+            color: var(--accent);
+            text-align: center;
+        }
+
+        .board-container {
+            position: relative;
+            width: 240px;
+            height: 240px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.5);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .board {
+            width: 240px;
+            height: 240px;
+            display: grid;
+            grid-template-columns: repeat(4, 60px);
+            grid-template-rows: repeat(4, 60px);
+            border: 3px solid #475569;
+            position: relative;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .cell.light { background-color: var(--board-light); }
+        .cell.dark { background-color: var(--board-dark); }
+        
+        .cell.highlight::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 18px; height: 18px;
+            background-color: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .cell.highlight-stage2::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 18px; height: 18px;
+            background-color: var(--warning);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--warning);
+        }
+
+        .cell.target-highlight::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 3px solid var(--danger);
+            background-color: rgba(239, 68, 68, 0.25);
+        }
+
+        .piece {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 60px;
+            height: 60px;
+            line-height: 60px;
+            text-align: center;
+            font-size: 40px;
+            user-select: none;
+            z-index: 10;
+            pointer-events: none;
+            will-change: transform;
+        }
+
+        .piece.white {
+            color: #ffffff;
+            text-shadow: 0 3px 6px rgba(0,0,0,0.9), 0 0 4px #000;
+        }
+
+        .piece.black {
+            color: #0f172a;
+            text-shadow: 0 0 3px #fff;
+            z-index: 5;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: var(--warning);
+            color: #000;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 6px;
+            display: none;
+            z-index: 25;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        .card-controls {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-bg {
+            flex-grow: 1;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+        }
+
+        .desc-box {
+            width: 100%;
+            background: #0b0f19;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.88rem;
+            box-sizing: border-box;
+            color: var(--text-muted);
+            border: 1px solid #1e293b;
+            line-height: 1.5;
+        }
+
+        .desc-box strong { color: var(--text-main); }
+        .desc-box span.highlight-text { color: var(--accent); font-weight: 600; }
+        .desc-box span.danger-text { color: var(--danger); font-weight: 600; }
+        .desc-box span.warning-text { color: var(--warning); font-weight: 600; }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Topluma Hizmet Uygulamaları: Satranç Mekanizmaları</h1>
+        <p class="subtitle">Trabzon Üniversitesi Çarşıbaşı MYO - Hamsifleto Grubu (Ünal Küçük, İsmail Can Şal, Yağız Domaç)</p>
+        
+        <div class="controls-global">
+            <button class="btn" onclick="toggleAll()">Hepsini Oynat / Durdur</button>
+            <button class="btn" onclick="resetAll()">Sıfırla & Başlat</button>
+            <label style="font-size: 0.9rem; font-weight:600;"> Hız:
+                <select id="speedSelect" onchange="changeSpeed()" class="btn">
+                    <option value="0.5">0.5x (Detaylı İzle)</option>
+                    <option value="1" selected>1.0x (Normal)</option>
+                    <option value="1.5">1.5x (Hızlı)</option>
+                </select>
+            </label>
+        </div>
+    </header>
+
+    <div class="grid-container">
+
+        <!-- 1. PİYON -->
+        <div class="card" id="card-pawn">
+            <span class="status-badge" id="badge-pawn">2 KARE HAKKI DOLDU</span>
+            <h2>1. Piyon (Tüm Süreç: 2 Kare, 1 Kare & Yeme)</h2>
+            <div class="board-container">
+                <div class="board" id="board-pawn"></div>
+                <div class="piece white" id="piece-pawn">♙</div>
+                <div class="piece black" id="target-pawn">♟</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('pawn')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-pawn"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Aşama 1:</strong> Başlangıç karesinden <span class="highlight-text">2 kare düz</span> fırlar.</p>
+                <p><strong>Aşama 2:</strong> 2 kare hakkı biter, <span class="warning-text">1 kare düz</span> yürüyüp yeme pozisyonuna geçer.</p>
+                <p><strong>Aşama 3:</strong> Doğrudan ön çaprazındaki <span class="danger-text">Siyah Piyonun üstüne</span> hamle yaparak taşı yer.</p>
+            </div>
+        </div>
+
+        <!-- 2. ŞAH -->
+        <div class="card" id="card-king">
+            <h2>2. Şah (King)</h2>
+            <div class="board-container">
+                <div class="board" id="board-king"></div>
+                <div class="piece white" id="piece-king">♔</div>
+                <div class="piece black" id="target-king">♟</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('king')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-king"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Menzil:</strong> Bulunduğu kareden etrafındaki 8 komşu kareye (1 birim) hareket eder.</p>
+                <p><strong>Taş Yeme:</strong> 1 birim çaprazındaki Siyah Piyonun karesine doğrudan giderek taşı tahtadan siler.</p>
+            </div>
+        </div>
+
+        <!-- 3. VEZİR -->
+        <div class="card" id="card-queen">
+            <h2>3. Vezir (Queen)</h2>
+            <div class="board-container">
+                <div class="board" id="board-queen"></div>
+                <div class="piece white" id="piece-queen">♕</div>
+                <div class="piece black" id="target-queen">♜</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('queen')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-queen"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Menzil:</strong> Dikey, yatay ve çapraz eksende önü açık olduğu sürece sınırsız ilerler.</p>
+                <p><strong>Taş Yeme:</strong> Çapraz eksenindeki Siyah Kalenin karesine doğrudan kesintisiz hatla ulaşır ve taşı alır.</p>
+            </div>
+        </div>
+
+        <!-- 4. KALE -->
+        <div class="card" id="card-rook">
+            <h2>4. Kale (Rook)</h2>
+            <div class="board-container">
+                <div class="board" id="board-rook"></div>
+                <div class="piece white" id="piece-rook">♖</div>
+                <div class="piece black" id="target-rook">♝</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('rook')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-rook"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Menzil:</strong> Ortogonal (+) eksende dikey veya yatay sınırsız hareket eder.</p>
+                <p><strong>Taş Yeme:</strong> Dikey hattında ilerleyerek Siyah Filin bulunduğu kareye girer ve taşı eler.</p>
+            </div>
+        </div>
+
+        <!-- 5. FİL -->
+        <div class="card" id="card-bishop">
+            <h2>5. Fil (Bishop)</h2>
+            <div class="board-container">
+                <div class="board" id="board-bishop"></div>
+                <div class="piece white" id="piece-bishop">♗</div>
+                <div class="piece black" id="target-bishop">♞</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('bishop')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-bishop"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Menzil:</strong> Yalnızca kendi kare rengindeki çapraz (X) hatlarda sınırsız ilerler.</p>
+                <p><strong>Taş Yeme:</strong> Çapraz hattında bekleyen Siyah Atın üzerine doğrudan gelerek taşı tahtadan çıkarır.</p>
+            </div>
+        </div>
+
+        <!-- 6. AT -->
+        <div class="card" id="card-knight">
+            <h2>6. At (Knight)</h2>
+            <div class="board-container">
+                <div class="board" id="board-knight"></div>
+                <div class="piece white" id="piece-knight">♘</div>
+                <div class="piece black" id="target-knight">♟</div>
+            </div>
+            <div class="card-controls">
+                <button class="btn" onclick="toggleCard('knight')">⏸/▶</button>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-knight"></div></div>
+            </div>
+            <div class="desc-box">
+                <p><strong>Menzil:</strong> 'L' matrisi çizer (2 dikey+1 yatay). Diğer taşların üzerinden atlayabilir.</p>
+                <p><strong>Taş Yeme:</strong> Üzerinden atladığı taşları yemez, sadece indiği hedef karedeki Siyah Piyonu yer.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>© 2026 Trabzon Üniversitesi Çarşıbaşı MYO - İnternet ve Ağ Teknolojileri Programı</p>
+    </footer>
+
+    <script>
+        const SIZE = 60;
+        let speedMultiplier = 1;
+        let globalRunning = true;
+
+        function createBoard(id, highlights = [], stage2HL = [], target = null) {
+            const b = document.getElementById(id);
+            b.innerHTML = '';
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = `cell ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                    
+                    if (highlights.some(h => h.r === r && h.c === c)) {
+                        cell.classList.add('highlight');
+                    }
+                    if (stage2HL.some(h => h.r === r && h.c === c)) {
+                        cell.classList.add('highlight-stage2');
+                    }
+                    if (target && target.r === r && target.c === c) {
+                        cell.classList.add('target-highlight');
+                    }
+                    b.appendChild(cell);
+                }
+            }
+        }
+
+        function setPos(el, r, c) {
+            const clampedR = Math.max(0, Math.min(3, r));
+            const clampedC = Math.max(0, Math.min(3, c));
+            el.style.transform = `translate3d(${clampedC * SIZE}px, ${clampedR * SIZE}px, 0)`;
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * Math.max(0, Math.min(1, t));
+        }
+
+        class PieceAnim {
+            constructor(name, config) {
+                this.name = name;
+                this.cfg = config;
+                this.time = 0;
+                this.dur = config.dur;
+                this.isRunning = true;
+                this.piece = document.getElementById(`piece-${name}`);
+                this.target = document.getElementById(`target-${name}`);
+                this.prog = document.getElementById(`prog-${name}`);
+                this.badge = document.getElementById(`badge-${name}`);
+                
+                createBoard(`board-${name}`, config.hl || [], config.stage2HL || [], config.targetHl);
+                this.reset();
+            }
+
+            reset() {
+                this.time = 0;
+                setPos(this.piece, this.cfg.start.r, this.cfg.start.c);
+                if (this.target) {
+                    setPos(this.target, this.cfg.target.r, this.cfg.target.c);
+                    this.target.style.display = 'block';
+                }
+                if (this.badge) this.badge.style.display = 'none';
+                this.updateProgress();
+            }
+
+            update(dt) {
+                if (!this.isRunning || !globalRunning) return;
+                
+                this.time += dt * speedMultiplier;
+                if (this.time >= this.dur) {
+                    this.time = 0;
+                }
+                
+                let p = this.time / this.dur;
+                this.cfg.run(p, this.piece, this.target, this.badge);
+                this.updateProgress();
+            }
+
+            updateProgress() {
+                if (this.prog) {
+                    this.prog.style.width = `${(this.time / this.dur) * 100}%`;
+                }
+            }
+
+            toggle() {
+                this.isRunning = !this.isRunning;
+            }
+        }
+
+        const anims = {};
+
+        // 1. PİYON (Tam ve Doğru Mantık Sıralaması)
+        anims['pawn'] = new PieceAnim('pawn', {
+            dur: 10000,
+            start: { r: 3, c: 1 },
+            target: { r: 0, c: 2 },
+            hl: [{ r: 2, c: 1 }, { r: 1, c: 1 }],
+            stage2HL: [{ r: 0, c: 1 }],
+            targetHl: { r: 0, c: 2 },
+            run: (p, piece, target, badge) => {
+                if (p < 0.15) {
+                    setPos(piece, 3, 1);
+                    if (target) target.style.display = 'block';
+                    if (badge) badge.style.display = 'none';
+                }
+                // 1. Aşama: 2 Kare Düz Çıkış (3,1 -> 1,1)
+                else if (p < 0.35) {
+                    let t = (p - 0.15) / 0.20;
+                    setPos(piece, lerp(3, 1, t), 1);
+                    if (badge) badge.style.display = 'none';
+                }
+                // Rozet Uyarısı
+                else if (p < 0.45) {
+                    setPos(piece, 1, 1);
+                    if (badge) badge.style.display = 'block';
+                }
+                // 2. Aşama: 1 Kare Düz Yürüyüp Taş Yeme Pozisyonuna Geçiş (1,1 -> 1,1 bekleme / 1,1 -> 1,1 pozisyonlama)
+                else if (p < 0.65) {
+                    let t = (p - 0.45) / 0.20;
+                    setPos(piece, lerp(1, 1, t), 1);
+                    if (badge) badge.style.display = 'block';
+                }
+                // Pozisyonda Hazırlık
+                else if (p < 0.70) {
+                    setPos(piece, 1, 1);
+                    if (badge) badge.style.display = 'block';
+                }
+                // 3. Aşama: Ön Çaprazındaki Siyah Piyonun Üstüne Doğrudan Hamle (1,1 -> 0,2)
+                else if (p < 0.90) {
+                    let t = (p - 0.70) / 0.20;
+                    setPos(piece, lerp(1, 0, t), lerp(1, 2, t));
+                    if (t > 0.85 && target) target.style.display = 'none';
+                }
+                else {
+                    setPos(piece, 0, 2);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // 2. ŞAH
+        anims['king'] = new PieceAnim('king', {
+            dur: 5000,
+            start: { r: 2, c: 1 },
+            target: { r: 1, c: 2 },
+            hl: [{r:1,c:0},{r:1,c:1},{r:2,c:0},{r:3,c:0},{r:3,c:1},{r:3,c:2},{r:2,c:2}],
+            targetHl: { r: 1, c: 2 },
+            run: (p, piece, target) => {
+                if (p < 0.2) {
+                    setPos(piece, 2, 1);
+                    if (target) target.style.display = 'block';
+                } else if (p < 0.65) {
+                    let t = (p - 0.2) / 0.45;
+                    setPos(piece, lerp(2, 1, t), lerp(1, 2, t));
+                    if (t > 0.85 && target) target.style.display = 'none';
+                } else {
+                    setPos(piece, 1, 2);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // 3. VEZİR
+        anims['queen'] = new PieceAnim('queen', {
+            dur: 5000,
+            start: { r: 3, c: 0 },
+            target: { r: 0, c: 3 },
+            hl: [{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:2,c:0},{r:1,c:0},{r:0,c:0},{r:2,c:1},{r:1,c:2}],
+            targetHl: { r: 0, c: 3 },
+            run: (p, piece, target) => {
+                if (p < 0.2) {
+                    setPos(piece, 3, 0);
+                    if (target) target.style.display = 'block';
+                } else if (p < 0.65) {
+                    let t = (p - 0.2) / 0.45;
+                    setPos(piece, lerp(3, 0, t), lerp(0, 3, t));
+                    if (t > 0.85 && target) target.style.display = 'none';
+                } else {
+                    setPos(piece, 0, 3);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // 4. KALE
+        anims['rook'] = new PieceAnim('rook', {
+            dur: 5000,
+            start: { r: 3, c: 1 },
+            target: { r: 0, c: 1 },
+            hl: [{r:3,c:0},{r:3,c:2},{r:3,c:3},{r:2,c:1},{r:1,c:1}],
+            targetHl: { r: 0, c: 1 },
+            run: (p, piece, target) => {
+                if (p < 0.2) {
+                    setPos(piece, 3, 1);
+                    if (target) target.style.display = 'block';
+                } else if (p < 0.65) {
+                    let t = (p - 0.2) / 0.45;
+                    setPos(piece, lerp(3, 0, t), 1);
+                    if (t > 0.85 && target) target.style.display = 'none';
+                } else {
+                    setPos(piece, 0, 1);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // 5. FİL
+        anims['bishop'] = new PieceAnim('bishop', {
+            dur: 5000,
+            start: { r: 3, c: 0 },
+            target: { r: 0, c: 3 },
+            hl: [{r:2,c:1},{r:1,c:2}],
+            targetHl: { r: 0, c: 3 },
+            run: (p, piece, target) => {
+                if (p < 0.2) {
+                    setPos(piece, 3, 0);
+                    if (target) target.style.display = 'block';
+                } else if (p < 0.65) {
+                    let t = (p - 0.2) / 0.45;
+                    setPos(piece, lerp(3, 0, t), lerp(0, 3, t));
+                    if (t > 0.85 && target) target.style.display = 'none';
+                } else {
+                    setPos(piece, 0, 3);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // 6. AT
+        anims['knight'] = new PieceAnim('knight', {
+            dur: 5000,
+            start: { r: 3, c: 1 },
+            target: { r: 1, c: 2 },
+            hl: [{r:2,c:1},{r:1,c:1}],
+            targetHl: { r: 1, c: 2 },
+            run: (p, piece, target) => {
+                if (p < 0.2) {
+                    setPos(piece, 3, 1);
+                    if (target) target.style.display = 'block';
+                } else if (p < 0.65) {
+                    let t = (p - 0.2) / 0.45;
+                    setPos(piece, lerp(3, 1, t), lerp(1, 2, t));
+                    if (t > 0.85 && target) target.style.display = 'none';
+                } else {
+                    setPos(piece, 1, 2);
+                    if (target) target.style.display = 'none';
+                }
+            }
+        });
+
+        // ANIMATION LOOP
+        let lastTime = performance.now();
+        function loop(now) {
+            let dt = now - lastTime;
+            lastTime = now;
+
+            for (let key in anims) {
+                anims[key].update(dt);
+            }
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+
+        // GLOBAL CONTROLS
+        function toggleCard(name) {
+            anims[name].toggle();
+        }
+
+        function toggleAll() {
+            globalRunning = !globalRunning;
+        }
+
+        function resetAll() {
+            for (let key in anims) {
+                anims[key].reset();
+            }
+        }
+
+        function changeSpeed() {
+            speedMultiplier = parseFloat(document.getElementById('speedSelect').value);
+        }
+    </script>
+</body>
+</html>
